@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: fix: define PTHREAD_STACK_MIN_CONST on ppc64
+
+PTHREAD_STACK_MIN is not a constant expression with current glibc.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/core/add-ppc64-pthread-stack-size.patch (156.0.8078.79-1).
+
+diff --git a/base/process/launch.h b/base/process/launch.h
+index 6b5c240b2dee5e23cbf212607713de57cea44b4b..7cda36f6c7c0881f1459c2e90cd728d062650916 100644
+--- a/base/process/launch.h
++++ b/base/process/launch.h
+@@ -56,6 +56,9 @@ enum TerminationStatus : int;
+ 
+ // These constants are borrowed from glibc's (arch)/bits/pthread_stack_min.h.
+ #if defined(ARCH_CPU_ARM64) || defined(ARCH_CPU_LOONGARCH64)
++#define PTHREAD_STACK_MIN_CONST \
++  (__builtin_constant_p(PTHREAD_STACK_MIN) ? PTHREAD_STACK_MIN : 131072)
++#elif defined(ARCH_CPU_PPC64)
+ #define PTHREAD_STACK_MIN_CONST \
+   (__builtin_constant_p(PTHREAD_STACK_MIN) ? PTHREAD_STACK_MIN : 131072)
+ #else

@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Trung=20L=C3=AA?= <8@tle.id.au>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: build: use the generic libvpx config on ppc64
+
+The checked-in ppc64 config does not build with clang. Use the portable
+generic config instead, as riscv64 does.
+
+diff --git a/third_party/libvpx/BUILD.gn b/third_party/libvpx/BUILD.gn
+index 1261a840fda18b0db3b0ad25d5b2724763fe9cb5..9cced5e485a8985a68b5b822185253f5f442c9b3 100644
+--- a/third_party/libvpx/BUILD.gn
++++ b/third_party/libvpx/BUILD.gn
+@@ -34,7 +34,7 @@ if (current_cpu == "x86") {
+   } else {
+     cpu_arch_full = "arm64-highbd"
+   }
+-} else if (current_cpu == "riscv64") {
++} else if (current_cpu == "riscv64" || current_cpu == "ppc64") {
+   cpu_arch_full = "generic"
+ } else if (current_cpu == "loong64") {
+   cpu_arch_full = "loongarch"
+@@ -464,9 +464,7 @@ source_set("libvpx_headers") {
+     } else {
+       sources = libvpx_srcs_arm64_headers
+     }
+-  } else if (current_cpu == "ppc64") {
+-    sources = libvpx_srcs_ppc64_headers
+-  } else if (current_cpu == "riscv64") {
++  } else if (current_cpu == "riscv64" || current_cpu == "ppc64") {
+     sources = libvpx_srcs_generic_headers
+   } else if (current_cpu == "loong64") {
+     sources = libvpx_srcs_loongarch_headers
+@@ -504,9 +502,7 @@ static_library("libvpx") {
+     } else {
+       sources = libvpx_srcs_arm64
+     }
+-  } else if (current_cpu == "ppc64") {
+-    sources = libvpx_srcs_ppc64
+-  } else if (current_cpu == "riscv64") {
++  } else if (current_cpu == "riscv64" || current_cpu == "ppc64") {
+     sources = libvpx_srcs_generic
+   } else if (current_cpu == "loong64") {
+     sources = libvpx_srcs_loongarch

@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: feat: add the ppc64 architecture string
+
+Return PPC_64 from SysInfo::ProcessCPUArchitecture().
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/core/add-ppc64-architecture-string.patch (156.0.8078.79-1).
+
+diff --git a/base/system/sys_info.cc b/base/system/sys_info.cc
+index 02daeaf7b8bf583a5dd2fe69f85c556b07b7d428..0121a98d35df5793083c984207eb2fc54abbe0d6 100644
+--- a/base/system/sys_info.cc
++++ b/base/system/sys_info.cc
+@@ -277,6 +277,8 @@ std::string SysInfo::ProcessCPUArchitecture() {
+   return "ARM";
+ #elif defined(ARCH_CPU_ARM64)
+   return "ARM_64";
++#elif defined(ARCH_CPU_PPC64)
++  return "PPC_64";
+ #elif defined(ARCH_CPU_RISCV64)
+   return "RISCV_64";
+ #else

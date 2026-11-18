@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: feat: add ppc64 to rtc_base/system/arch.h
+
+Define the architecture macros for ppc64.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/webrtc/Rtc_base-system-arch.h-PPC.patch (156.0.8078.79-1).
+
+diff --git a/rtc_base/system/arch.h b/rtc_base/system/arch.h
+index 9d945ef7fc1d6a7aa12ffbc0837c1aec5f1bb08a..2b29dc00f2cc4579d08ed32446e6cb987157ccc6 100644
+--- a/rtc_base/system/arch.h
++++ b/rtc_base/system/arch.h
+@@ -46,6 +46,18 @@
+ #endif
+ #if defined(__MIPSEL__)
+ #define WEBRTC_ARCH_LITTLE_ENDIAN
++#elif defined(__PPC__)
++#define WEBRTC_ARCH_PPC_FAMILY
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define WEBRTC_ARCH_LITTLE_ENDIAN
++#else
++#define WEBRTC_ARCH_BIG_ENDIAN
++#endif
++#if defined(__LP64__)
++#define WEBRTC_ARCH_64_BITS
++#else
++#define WEBRTC_ARCH_32_BITS
++#endif
+ #else
+ #define WEBRTC_ARCH_BIG_ENDIAN
+ #endif

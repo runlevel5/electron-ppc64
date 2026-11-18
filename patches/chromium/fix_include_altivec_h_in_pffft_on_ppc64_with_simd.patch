@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Shawn Anastasio <shawn@anastas.io>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: fix: include altivec.h in pffft on ppc64 with SIMD
+
+pffft uses AltiVec intrinsics on ppc64 but never includes the header.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/third_party/0001-third_party-pffft-Include-altivec.h-on-ppc64-with-SI.patch (156.0.8078.79-1).
+
+diff --git a/third_party/pffft/src/pffft.c b/third_party/pffft/src/pffft.c
+index bdac4d784999cd5b89fbb08049e8e5a6bd582364..51e0f2cacc4339fe1fb020ba9de500bcad124d87 100644
+--- a/third_party/pffft/src/pffft.c
++++ b/third_party/pffft/src/pffft.c
+@@ -100,6 +100,7 @@
+    Altivec support macros 
+ */
+ #if !defined(PFFFT_SIMD_DISABLE) && (defined(__ppc__) || defined(__ppc64__))
++#include <altivec.h>
+ typedef vector float v4sf;
+ #  define SIMD_SZ 4
+ #  define VZERO() ((vector float) vec_splat_u8(0))

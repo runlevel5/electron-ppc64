@@ -1,2 +1,3 @@
 expose_ripemd160.patch
 feat_expose_several_extra_cipher_functions.patch
+build_recognize_ppc64le_as_a_64-bit_target.patch

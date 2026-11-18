@@ -30,3 +30,6 @@ cherry-pick-5cf721be5762.patch
 cherry-pick-f06c0f9f0b84.patch
 cherry-pick-fd940821e208.patch
 cherry-pick-53659df718e8.patch
+build_force_baseline_power8_altivec_vsx_features_on_ppc64_linux.patch
+feat_enable_pointer_compression_on_ppc64.patch
+fix_read_ppc64_cpu_information_with_getauxval.patch

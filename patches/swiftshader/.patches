@@ -1,0 +1,2 @@
+build_add_missing_mc_sources_to_the_bundled_llvm.patch
+build_add_the_mc_xcoff_base_classes_to_the_bundled_llvm_ppc_target.patch

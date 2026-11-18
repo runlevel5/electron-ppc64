@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: fix: use the arm64 Linux allocator limits on ppc64
+
+ppc64le commonly runs with 64K pages, like arm64. Use the same TLS
+allocation chunk size and maximum supported alignment.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/fixes/fix-page-allocator-overflow.patch (156.0.8078.79-1).
+
+diff --git a/base/allocator/dispatcher/tls.h b/base/allocator/dispatcher/tls.h
+index 9b52ff26b0a062b495eec3b3713924821f3bf21d..3a1e859b3c2b26e18d57e94c52e56df4532ec0d6 100644
+--- a/base/allocator/dispatcher/tls.h
++++ b/base/allocator/dispatcher/tls.h
+@@ -84,6 +84,8 @@ struct BASE_EXPORT MMapAllocator {
+   constexpr static size_t AllocationChunkSize = 16384;
+ #elif BUILDFLAG(IS_LINUX) && defined(ARCH_CPU_ARM64)
+   constexpr static size_t AllocationChunkSize = 16384;
++#elif BUILDFLAG(IS_LINUX) && defined(ARCH_CPU_PPC64)
++  constexpr static size_t AllocationChunkSize = 16384;
+ #else
+   constexpr static size_t AllocationChunkSize = 4096;
+ #endif
+diff --git a/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_constants.h b/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_constants.h
+index 29782157088520adc091d4632c44fa5b430c6ab6..fcebc5350f08c5a9ba1456af7a2c95ca0d5879f3 100644
+--- a/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_constants.h
++++ b/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_constants.h
+@@ -235,7 +235,7 @@ constexpr size_t kMinDirectMappedDownsize =
+ // TODO(casey.smalley@arm.com): under 64k pages we can end up in a situation
+ // where a normal slot span will be large enough to contain multiple items,
+ // but the address will go over the final partition page after being aligned.
+-#if PA_BUILDFLAG(IS_LINUX) && PA_BUILDFLAG(PA_ARCH_CPU_ARM64)
++#if PA_BUILDFLAG(IS_LINUX) && (PA_BUILDFLAG(PA_ARCH_CPU_ARM64) || PA_BUILDFLAG(PA_ARCH_CPU_PPC64))
+ inline constexpr size_t kMaxSupportedAlignment = kSuperPageSize / 4;
+ #else
+ inline constexpr size_t kMaxSupportedAlignment = kSuperPageSize / 2;

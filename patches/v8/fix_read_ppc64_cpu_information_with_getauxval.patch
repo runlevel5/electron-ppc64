@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Trung=20L=C3=AA?= <8@tle.id.au>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: fix: read ppc64 CPU information with getauxval()
+
+CPU::DetectFeatures() opens /proc/self/auxv, which fails inside the
+renderer sandbox. The processor type is then left unknown and sandboxed
+processes fail the POWER9 feature check. getauxval() returns the same
+values without touching the filesystem.
+
+diff --git a/src/base/cpu/cpu-ppc.cc b/src/base/cpu/cpu-ppc.cc
+index 8691fa78322c47339b42e81fa096b08328052758..72e806e67ac4b25534b69ab23472c39eb68067fe 100644
+--- a/src/base/cpu/cpu-ppc.cc
++++ b/src/base/cpu/cpu-ppc.cc
+@@ -40,29 +40,15 @@ namespace v8::base {
+ void CPU::DetectFeatures() {
+ #ifndef USE_SIMULATOR
+ #if V8_OS_LINUX
+-  // Read processor info from /proc/self/auxv.
+-  char* auxv_cpu_type = nullptr;
+-  FILE* fp = base::Fopen("/proc/self/auxv", "r");
+-  if (fp != nullptr) {
+-    Elf64_auxv_t entry;
+-    for (;;) {
+-      size_t n = fread(&entry, sizeof(entry), 1, fp);
+-      if (n == 0 || entry.a_type == AT_NULL) {
+-        break;
+-      }
+-      switch (entry.a_type) {
+-        case AT_PLATFORM:
+-          auxv_cpu_type = reinterpret_cast<char*>(entry.a_un.a_val);
+-          break;
+-        case AT_ICACHEBSIZE:
+-          icache_line_size_ = entry.a_un.a_val;
+-          break;
+-        case AT_DCACHEBSIZE:
+-          dcache_line_size_ = entry.a_un.a_val;
+-          break;
+-      }
+-    }
+-    base::Fclose(fp);
++  // Read processor info from the auxiliary vector. Use getauxval() rather than
++  // /proc/self/auxv, which cannot be opened from inside a sandboxed process.
++  const char* auxv_cpu_type =
++      reinterpret_cast<const char*>(getauxval(AT_PLATFORM));
++  if (unsigned long size = getauxval(AT_ICACHEBSIZE)) {
++    icache_line_size_ = static_cast<int>(size);
++  }
++  if (unsigned long size = getauxval(AT_DCACHEBSIZE)) {
++    dcache_line_size_ = static_cast<int>(size);
+   }
+ 
+   part_ = -1;

@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Trung=20L=C3=AA?= <8@tle.id.au>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: build: use the generic libaom config on ppc64
+
+There is no ppc64 config for libaom. Use the portable generic config, as
+riscv64 does.
+
+diff --git a/third_party/libaom/BUILD.gn b/third_party/libaom/BUILD.gn
+index 6684526a98876311986e5225bd7413ebb0ed4999..7f52e2607ad8f2b94df11ed866ce53f88d554f2b 100644
+--- a/third_party/libaom/BUILD.gn
++++ b/third_party/libaom/BUILD.gn
+@@ -26,7 +26,7 @@ if (current_cpu == "x86") {
+   cpu_arch_full = "arm-neon"
+ } else if (current_cpu == "arm64" || current_cpu == "arm64e") {
+   cpu_arch_full = "arm64-cpu-detect"
+-} else if (current_cpu == "riscv64") {
++} else if (current_cpu == "riscv64" || current_cpu == "ppc64") {
+   cpu_arch_full = "generic"
+ } else if (current_cpu == "loong64") {
+   cpu_arch_full = "generic"

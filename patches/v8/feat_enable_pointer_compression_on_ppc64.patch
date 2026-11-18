@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@solidsilicon.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: feat: enable pointer compression on ppc64
+
+Allow pointer compression, which Electron requires, on ppc64.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/v8/0001-Enable-ppc64-pointer-compression.patch (156.0.8078.79-1).
+
+diff --git a/gni/v8.gni b/gni/v8.gni
+index 3fb7d2964ab15085f60978b283f898c1f7f97d4c..e3f3d658f660c36c33d47fc84bff44704f012a64 100644
+--- a/gni/v8.gni
++++ b/gni/v8.gni
+@@ -348,7 +348,7 @@ assert(
+ if (v8_enable_pointer_compression == "") {
+   v8_enable_pointer_compression =
+       v8_current_cpu == "arm64" || v8_current_cpu == "x64" ||
+-      v8_current_cpu == "loong64"
++      v8_current_cpu == "loong64" || v8_current_cpu == "ppc64"
+ }
+ 
+ # The Wasm interpreter is currently supported only on arm64 and x64, on
