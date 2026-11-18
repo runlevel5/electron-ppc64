@@ -36,6 +36,11 @@ if (
   }
 }
 
+// Node.js reports both endiannesses as ppc64; the artifacts are little-endian.
+if (platform === 'linux' && arch === 'ppc64' && os.endianness() === 'LE') {
+  arch = 'ppc64le';
+}
+
 // downloads if not cached
 downloadArtifact({
   version,
