@@ -22,6 +22,7 @@ const require = createRequire(import.meta.url);
 
 const fixturesPath = path.resolve(import.meta.dirname, 'fixtures', 'api', 'utility-process');
 const isWindowsOnArm = process.platform === 'win32' && process.arch === 'arm64';
+const isPpc64 = process.arch === 'ppc64';
 
 describe('utilityProcess module', { retry: 0 }, () => {
   describe('UtilityProcess constructor', () => {
@@ -184,9 +185,9 @@ describe('utilityProcess module', { retry: 0 }, () => {
       expect(lines[0]).toBe('before exit');
     });
 
-    // 32-bit system will not have V8 Sandbox enabled.
+    // 32-bit and ppc64 systems will not have V8 Sandbox enabled.
     // WoA testing does not have VS toolchain configured to build native addons.
-    ifit(!isWindowsOnArm)("emits 'error' when fatal error is triggered from V8", async () => {
+    ifit(!isWindowsOnArm && !isPpc64)("emits 'error' when fatal error is triggered from V8", async () => {
       const child = utilityProcess.fork(path.join(fixturesPath, 'external-ab-test.js'));
       const [type, location, report] = await once(child, 'error');
       const [code] = await once(child, 'exit');
