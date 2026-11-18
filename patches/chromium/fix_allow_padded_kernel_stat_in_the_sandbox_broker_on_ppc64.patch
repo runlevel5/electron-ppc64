@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: fix: allow padded kernel stat in the sandbox broker on ppc64
+
+The kernel stat structure has padding on ppc64, so it has no unique object
+representation and cannot be passed to byte_span_from_ref() unqualified.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/sandbox/0009-sandbox-ignore-byte-span-error.patch (156.0.8078.79-1).
+
+diff --git a/sandbox/linux/syscall_broker/broker_host.cc b/sandbox/linux/syscall_broker/broker_host.cc
+index cc3a07275df7100ff14cf37f7680daee3f2f0c74..fc0ded5097634a608579e08793a0b8d986d83694 100644
+--- a/sandbox/linux/syscall_broker/broker_host.cc
++++ b/sandbox/linux/syscall_broker/broker_host.cc
+@@ -289,7 +289,12 @@ void BrokerHost::StatFileForIPC(BrokerCommand command_type,
+       return;
+     }
+     RAW_CHECK(reply->AddIntToMessage(0));
++#ifdef __powerpc64__
++    // kernel stat can be padded, triggering std::has_unique_object_representations_v to return false
++    RAW_CHECK(reply->AddDataToMessage(base::byte_span_from_ref(base::allow_nonunique_obj, sb)));
++#else
+     RAW_CHECK(reply->AddDataToMessage(base::byte_span_from_ref(sb)));
++#endif
+   } else {
+ #if defined(__NR_fstatat64)
+     DCHECK(command_type == COMMAND_STAT64);

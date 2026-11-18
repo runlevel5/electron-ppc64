@@ -1,1 +1,2 @@
 fix_handle_pipewire_capturer_initialization_and_management.patch
+feat_add_ppc64_to_rtc_base_system_arch_h.patch

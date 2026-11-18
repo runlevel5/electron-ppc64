@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: fix: do not use musttail in PartitionAlloc on ppc64
+
+clang rejects [[clang::musttail]] on indirect calls when targeting PPC,
+which breaks the allocator shim.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/workarounds/HACK-debian-clang-disable-pa-musttail.patch (156.0.8078.79-1).
+
+diff --git a/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/compiler_specific.h b/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/compiler_specific.h
+index a4ec37a12fe6dfd964c0356908f30692fec6a6f1..9bc58bcd4f1c92ddb0d9f88608edb3d6c34b3e56 100644
+--- a/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/compiler_specific.h
++++ b/base/allocator/partition_allocator/src/partition_alloc/partition_alloc_base/compiler_specific.h
+@@ -157,7 +157,7 @@
+ //     PA_MUSTTAIL return Func1(d + 1);  // `Func1()` will be tail-called.
+ //   }
+ // ```
+-#if __has_cpp_attribute(clang::musttail)
++#if __has_cpp_attribute(clang::musttail) && !defined(__powerpc64__)
+ #define PA_MUSTTAIL [[clang::musttail]]
+ #else
+ #define PA_MUSTTAIL

@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: feat: add ppc64 to the extensions platform architectures
+
+Let chrome.runtime.getPlatformInfo() and manifests name ppc64.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/core/add-ppc64-architecture-to-extensions.diff (156.0.8078.79-1).
+
+diff --git a/chrome/browser/extensions/api/runtime/chrome_runtime_api_delegate.cc b/chrome/browser/extensions/api/runtime/chrome_runtime_api_delegate.cc
+index fb00714a3e96c7e571485f8f85c9a7a25d8d211f..766a716b0ee60f705f2e72f335d3479503a8e899 100644
+--- a/chrome/browser/extensions/api/runtime/chrome_runtime_api_delegate.cc
++++ b/chrome/browser/extensions/api/runtime/chrome_runtime_api_delegate.cc
+@@ -365,6 +365,8 @@ bool ChromeRuntimeAPIDelegate::GetPlatformInfo(PlatformInfo* info) {
+     info->arch = extensions::api::runtime::PlatformArch::kMips64;
+   } else if (arch == "riscv64") {
+     info->arch = extensions::api::runtime::PlatformArch::kRiscv64;
++  } else if (arch == "ppc64") {
++    info->arch = extensions::api::runtime::PlatformArch::kPpc64;
+   } else {
+     NOTREACHED();
+   }
+diff --git a/extensions/common/api/runtime.json b/extensions/common/api/runtime.json
+index 5706611e6d1ed3c64e6132a84c83d6f009de15fd..5c2053a1a807d8b71874e20369d1b7ebba5cacd8 100644
+--- a/extensions/common/api/runtime.json
++++ b/extensions/common/api/runtime.json
+@@ -117,7 +117,8 @@
+             {"name": "x86-64", "description": "Specifies the processer architecture as x86-64."},
+             {"name": "mips", "description": "Specifies the processer architecture as mips."},
+             {"name": "mips64", "description": "Specifies the processer architecture as mips64."},
+-            {"name": "riscv64", "description": "Specifies the processer architecture as riscv64."}
++            {"name": "riscv64", "description": "Specifies the processer architecture as riscv64."},
++            {"name": "ppc64", "description": "Specifies the processer architecture as ppc64."}
+          ],
+         "description": "The machine's processor architecture."
+       },
+@@ -131,7 +132,8 @@
+           {"name": "x86-32", "description": "Specifies the native client architecture as x86-32."},
+           {"name": "x86-64", "description": "Specifies the native client architecture as x86-64."},
+           {"name": "mips", "description": "Specifies the native client architecture as mips."},
+-          {"name": "mips64", "description": "Specifies the native client architecture as mips64."}
++          {"name": "mips64", "description": "Specifies the native client architecture as mips64."},
++          {"name": "ppc64", "description": "Specifies the native client architecture as ppc64."}
+         ]
+       },
+       {

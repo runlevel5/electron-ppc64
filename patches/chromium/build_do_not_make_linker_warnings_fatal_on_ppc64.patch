@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Daniel Richard G <skunk@iSKUNK.ORG>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: build: do not make linker warnings fatal on ppc64
+
+The linker warns about modules with different data layouts on ppc64le,
+which --fatal-warnings turns into an error.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/fixes/fix-different-data-layouts.patch (156.0.8078.79-1).
+
+diff --git a/build/config/compiler/BUILD.gn b/build/config/compiler/BUILD.gn
+index 2a107602b8d5f96bf1a161caf8d8f3c7b6078510..d510feae5394f0b3dc3d8a86e349346710a9b68a 100644
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -1085,7 +1085,7 @@ config("linker") {
+         # errors. We only apply fatal warnings when using lld.
+         ldflags += [ "-Wl,-fatal_warnings" ]
+       }
+-      if (!is_apple && current_os != "aix" && current_os != "zos") {
++      if (!is_apple && current_os != "aix" && current_os != "zos" && current_cpu != "ppc64") {
+         ldflags += [ "-Wl,--fatal-warnings" ]
+       }
+     }

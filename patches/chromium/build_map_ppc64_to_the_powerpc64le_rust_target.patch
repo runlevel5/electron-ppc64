@@ -1,0 +1,23 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andres Salomon <dilinger@queued.net>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: build: map ppc64 to the powerpc64le Rust target
+
+Teach the Rust target-triple selection about ppc64.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/fixes/fix-rustc.patch (156.0.8078.79-1).
+
+diff --git a/build/config/rust.gni b/build/config/rust.gni
+index 146007fa04fac586092471c4d7d784c65933d07f..d59d88eb16b3150be885409f1cb3f2028ec0c574 100644
+--- a/build/config/rust.gni
++++ b/build/config/rust.gni
+@@ -203,6 +203,9 @@ rust_abi_target = ""
+ if (is_linux || is_chromeos) {
+   if (current_cpu == "arm64") {
+     rust_abi_target = "aarch64-unknown-linux-gnu"
++  } else if (current_cpu == "ppc64") {
++    rust_abi_target = "powerpc64le-unknown-linux-gnu"
++    cargo_target_abi = ""
+   } else if (current_cpu == "x86") {
+     rust_abi_target = "i686-unknown-linux-gnu"
+   } else if (current_cpu == "x64") {

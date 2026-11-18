@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: fix: check for ppc64 before ppc in platform detection
+
+ppc64 also defines __PPC__, so the 32-bit check must not come first.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/third_party/dawn-fix-ppc64le-detection.patch (156.0.8078.79-1).
+
+diff --git a/src/utils/platform.h b/src/utils/platform.h
+index 4dd58a4878e18ce1771c0f88017fa7aea901a190..d2cb8b755a747434d08de68406f9d394512b143a 100644
+--- a/src/utils/platform.h
++++ b/src/utils/platform.h
+@@ -163,10 +163,12 @@
+ #elif defined(__s390x__)
+ #define DAWN_PLATFORM_IS_S390X 1
+ 
+-#elif defined(__PPC__)
+-#define DAWN_PLATFORM_IS_PPC 1
++// Order matters here
++// PPC64 also defines PPC, which can lead to detection failures on ppc64le systems
+ #elif defined(__PPC64__)
+ #define DAWN_PLATFORM_IS_PPC64 1
++#elif defined(__PPC__)
++#define DAWN_PLATFORM_IS_PPC 1
+ 
+ #elif defined(__wasm32__)
+ #define DAWN_PLATFORM_IS_WASM32 1

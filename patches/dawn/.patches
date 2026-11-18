@@ -8,3 +8,4 @@ cherry-pick-fa6d8546f008.patch
 cherry-pick-4a4e5d06e909.patch
 cherry-pick-3c84c0a3fbb3.patch
 cherry-pick-7792484a781c.patch
+fix_check_for_ppc64_before_ppc_in_platform_detection.patch

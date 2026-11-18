@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Timothy Pearson <tpearson@raptorengineering.com>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: build: force baseline POWER8 / AltiVec / VSX features on ppc64 Linux
+
+Build with -mcpu=power8 -maltivec -mvsx on Linux, the ppc64le baseline.
+
+Origin: Debian chromium packaging, debian/patches/ppc64le/third_party/0001-Force-baseline-POWER8-AltiVec-VSX-CPU-features-when-.patch (156.0.8078.79-1).
+
+diff --git a/BUILD.gn b/BUILD.gn
+index 192a01bd5f6be2b0d35a7a0cede7c4371729e5d8..117ab1856fba975f8cc711fb624ffdecaef13af4 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -1788,7 +1788,14 @@ config("toolchain") {
+   if (v8_current_cpu == "ppc64") {
+     defines += [ "V8_TARGET_ARCH_PPC64" ]
+     cflags += [ "-ffp-contract=off" ]
+-    if (!v8_target_is_simulator) {
++    if (current_os == "linux") {
++        cflags += [
++        # Enable usage of AltiVec, VSX, and other POWER8 and higher features
++        "-mcpu=power8",
++        "-maltivec",
++        "-mvsx",
++      ]
++    } else if (!v8_target_is_simulator) {
+       cflags += [ "-mcpu=pwr9" ]
+     }
+   }

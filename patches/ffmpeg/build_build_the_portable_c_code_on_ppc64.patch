@@ -1,0 +1,103 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Trung=20L=C3=AA?= <8@tle.id.au>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: build: build the portable C code on ppc64
+
+There is no generated config for ppc64. Reuse the riscv64 config, which
+enables the same components, with its architecture macros overridden so
+that only the portable C implementations are built.
+
+diff --git a/BUILD.gn b/BUILD.gn
+index c5f163fe5091625b061f124690b9e4a1d8465548..77ed4d96da490d46711d81cbc851b0350e337ff4 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -13,6 +13,14 @@ import("//build/config/sanitizers/sanitizers.gni")
+ platform_config_root =
+     "chromium/config/$ffmpeg_branding/$os_config/$ffmpeg_arch"
+ 
++# ppc64 has no generated config. Build the portable C code by reusing the
++# riscv64 config with its architecture macros overridden.
++platform_config_overrides = []
++if (current_cpu == "ppc64") {
++  platform_config_root = "chromium/config/$ffmpeg_branding/$os_config/riscv64"
++  platform_config_overrides = [ "chromium/config/ppc64_generic" ]
++}
++
+ has_nasm_deps =
+     ffmpeg_asm_sources != [] &&
+     (current_cpu == "x86" || current_cpu == "x64") && os_config != "linux-noasm"
+@@ -85,10 +93,10 @@ if (has_nasm_deps) {
+ }
+ 
+ config("ffmpeg_dependent_config") {
+-  include_dirs = [
+-    platform_config_root,
+-    ".",
+-  ]
++  include_dirs = platform_config_overrides + [
++                   platform_config_root,
++                   ".",
++                 ]
+ }
+ 
+ if (is_win) {
+@@ -239,16 +247,17 @@ if (is_component_ffmpeg) {
+   # in many large global arrays (and associated code) into chrome.dll.
+   link_target_type = "static_library"
+ }
++
+ target(link_target_type, "ffmpeg_internal") {
+   sources = ffmpeg_c_sources + ffmpeg_gas_sources + [
+               "$platform_config_root/config.h",
+               "$platform_config_root/libavutil/avconfig.h",
+             ]
+   inputs = ffmpeg_c_deps
+-  include_dirs = [
+-    platform_config_root,
+-    ".",
+-  ]
++  include_dirs = platform_config_overrides + [
++                   platform_config_root,
++                   ".",
++                 ]
+   defines = [
+     "HAVE_AV_CONFIG_H",
+     "_POSIX_C_SOURCE=200112",
+diff --git a/chromium/config/ppc64_generic/config.h b/chromium/config/ppc64_generic/config.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..856dd4a8b1a10aff210c8f093d57a7a574a3ff85
+--- /dev/null
++++ b/chromium/config/ppc64_generic/config.h
+@@ -0,0 +1,32 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++// ppc64 has no generated FFmpeg config. This header wraps the riscv64 one,
++// which enables the same components, and turns off its architecture-specific
++// code so that only the portable C implementations are built.
++
++#ifndef CHROMIUM_CONFIG_PPC64_GENERIC_CONFIG_H_
++#define CHROMIUM_CONFIG_PPC64_GENERIC_CONFIG_H_
++
++#include_next "config.h"
++
++#undef ARCH_RISCV
++#define ARCH_RISCV 0
++#undef HAVE_RV
++#define HAVE_RV 0
++#undef HAVE_RVV
++#define HAVE_RVV 0
++#undef HAVE_RV_ZICBOP
++#define HAVE_RV_ZICBOP 0
++#undef HAVE_RV_ZVBB
++#define HAVE_RV_ZVBB 0
++#undef HAVE_ASM_HWPROBE_H
++#define HAVE_ASM_HWPROBE_H 0
++
++#undef HAVE_FAST_CLZ
++#define HAVE_FAST_CLZ 1
++#undef HAVE_FAST_UNALIGNED
++#define HAVE_FAST_UNALIGNED 1
++
++#endif  // CHROMIUM_CONFIG_PPC64_GENERIC_CONFIG_H_

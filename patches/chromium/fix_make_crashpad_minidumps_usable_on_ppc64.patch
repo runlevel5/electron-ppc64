@@ -1,0 +1,340 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Trung=20L=C3=AA?= <8@tle.id.au>
+Date: Thu, 19 Nov 2026 09:33:59 +1100
+Subject: fix: make crashpad minidumps usable on ppc64
+
+The crashpad handler aborted on a NOTREACHED while writing a minidump
+because MinidumpSystemInfoWriter had no PPC64 case, leaving 0-byte dumps.
+
+MinidumpContextPPC64 did not match Breakpad's MDRawContextPPC64, so
+minidump processors could not read thread contexts. Give it the same
+layout.
+
+Also add ppc64 to the minidump reader and repair the ppc64 unit tests,
+which no longer compiled.
+
+diff --git a/third_party/crashpad/crashpad/minidump/minidump_context.h b/third_party/crashpad/crashpad/minidump/minidump_context.h
+index e65180bece81e11dd108926dd604fb21806f9416..27790454a86734bc7df119b1c80e077e604c0d15 100644
+--- a/third_party/crashpad/crashpad/minidump/minidump_context.h
++++ b/third_party/crashpad/crashpad/minidump/minidump_context.h
+@@ -714,7 +714,10 @@ enum MinidumpContextPPC64Flags : uint32_t {
+ };
+ 
+ //! \brief A PPC64 CPU context carried in a minidump file.
+-//! Based on minidump_cpu_ppc64.h from breakpad.
++//!
++//! This structure must stay layout-compatible with Breakpad's
++//! `MDRawContextPPC64` (minidump_cpu_ppc64.h), which is what minidump
++//! processors use to recognize and read the context.
+ struct MinidumpContextPPC64 {
+   uint64_t context_flags;
+ 
+@@ -727,11 +730,17 @@ struct MinidumpContextPPC64 {
+   uint64_t lnk;
+   uint64_t ctr;
+ 
++  //! \brief VRSAVE register.
++  uint64_t vrsave;
++
+   //! \brief Floating point registers.
+   double fpregs[32];
+ 
++  //! \brief Padding included for breakpad compatibility.
++  uint32_t fpscr_pad;
++
+   //! \brief FPU status register.
+-  double fpscr;
++  uint32_t fpscr;
+ 
+   //! \brief Altivec/VMX vector registers.
+   struct {
+@@ -742,8 +751,8 @@ struct MinidumpContextPPC64 {
+       //! \brief Padding included for breakpad compatibiltiy.
+       uint32_t save_pad5[4];
+ 
+-      //! \brief VRSAVE register.
+-      uint32_t save_vrsave;
++      //! \brief Bitmask of the vector registers that are saved.
++      uint32_t save_vrvalid;
+ 
+       //! \brief Padding included for breakpad compatibiltiy.
+       uint32_t save_pad6[7];
+diff --git a/third_party/crashpad/crashpad/minidump/minidump_context_writer.cc b/third_party/crashpad/crashpad/minidump/minidump_context_writer.cc
+index 3ce24a24cd83f7624f8deb68167d9041387d634a..cccd1816b23a5c1e279269215e352d2b3d269dcf 100644
+--- a/third_party/crashpad/crashpad/minidump/minidump_context_writer.cc
++++ b/third_party/crashpad/crashpad/minidump/minidump_context_writer.cc
+@@ -613,6 +613,9 @@ size_t MinidumpContextRISCV64Writer::ContextSize() const {
+   return sizeof(context_);
+ }
+ 
++static_assert(sizeof(MinidumpContextPPC64) == 1160,
++              "must match Breakpad's MDRawContextPPC64");
++
+ MinidumpContextPPC64Writer::MinidumpContextPPC64Writer()
+   : MinidumpContextWriter(), context_() {
+     context_.context_flags = kMinidumpContextPPC64;
+@@ -636,13 +639,17 @@ void MinidumpContextPPC64Writer::InitializeFromSnapshot(
+   context_.ctr = context_snapshot->ctr;
+ 
+   memcpy(context_.fpregs, context_snapshot->fpregs, sizeof(context_.fpregs));
+-  context_.fpscr = context_snapshot->fpscr;
++  // The snapshot carries FPSCR as the raw 64-bit register image.
++  uint64_t fpscr;
++  memcpy(&fpscr, &context_snapshot->fpscr, sizeof(fpscr));
++  context_.fpscr = static_cast<uint32_t>(fpscr);
+ 
+   memcpy(context_.vregs.save_vr, context_snapshot->vregs.save_vr,
+          sizeof(context_.vregs.save_vr));
+   memcpy(&context_.vregs.save_vscr, &context_snapshot->vregs.save_vscr,
+          sizeof(context_.vregs.save_vscr));
+-  context_.vregs.save_vrsave = context_snapshot->vregs.save_vrsave;
++  context_.vregs.save_vrvalid = 0xffffffff;
++  context_.vrsave = context_snapshot->vregs.save_vrsave;
+ }
+ 
+ bool MinidumpContextPPC64Writer::WriteObject(
+diff --git a/third_party/crashpad/crashpad/minidump/minidump_context_writer_test.cc b/third_party/crashpad/crashpad/minidump/minidump_context_writer_test.cc
+index 8d136da09fdbf0c98bef13d668decdb0263f1b65..23c8742be273dcc46cd91f679f62a55d8240f950 100644
+--- a/third_party/crashpad/crashpad/minidump/minidump_context_writer_test.cc
++++ b/third_party/crashpad/crashpad/minidump/minidump_context_writer_test.cc
+@@ -322,19 +322,21 @@ TYPED_TEST(MinidumpContextWriter, RISCV64_FromSnapshot) {
+                    TypeParam>(context, ExpectMinidumpContextRISCV64, kSeed);
+ }
+ 
+-TEST(MinidumpContextWriter, PPC64_Zeros) {
+-  EmptyContextTest<MinidumpContextPPC64Writer, MinidumpContextPPC64>(
+-    ExpectMinidumpContextPPC64);
++TYPED_TEST(MinidumpContextWriter, PPC64_Zeros) {
++  EmptyContextTest<MinidumpContextPPC64Writer,
++                   MinidumpContextPPC64,
++                   TypeParam>(ExpectMinidumpContextPPC64);
+ }
+ 
+-TEST(MinidumpContextWriter, PPC64_FromSnapshot) {
++TYPED_TEST(MinidumpContextWriter, PPC64_FromSnapshot) {
+   constexpr uint32_t kSeed = 64;
+   CPUContextPPC64 context_ppc64;
+   CPUContext context;
+   context.ppc64 = &context_ppc64;
+   InitializeCPUContextPPC64(&context, kSeed);
+-  FromSnapshotTest<MinidumpContextPPC64Writer, MinidumpContextPPC64>(
+-      context, ExpectMinidumpContextPPC64, kSeed);
++  FromSnapshotTest<MinidumpContextPPC64Writer,
++                   MinidumpContextPPC64,
++                   TypeParam>(context, ExpectMinidumpContextPPC64, kSeed);
+ }
+ 
+ }  // namespace
+diff --git a/third_party/crashpad/crashpad/minidump/minidump_system_info_writer.cc b/third_party/crashpad/crashpad/minidump/minidump_system_info_writer.cc
+index e9e05124aa111fb044571a33833bc25aaade0157..18b10546ef940c2a49ad6a4875bc3621ac0dad1b 100644
+--- a/third_party/crashpad/crashpad/minidump/minidump_system_info_writer.cc
++++ b/third_party/crashpad/crashpad/minidump/minidump_system_info_writer.cc
+@@ -132,6 +132,9 @@ void MinidumpSystemInfoWriter::InitializeFromSnapshot(
+     case kCPUArchitectureARM64:
+       cpu_architecture = kMinidumpCPUArchitectureARM64;
+       break;
++    case kCPUArchitecturePPC64:
++      cpu_architecture = kMinidumpCPUArchitecturePPC64;
++      break;
+     case kCPUArchitectureRISCV64:
+       cpu_architecture = kMinidumpCPUArchitectureRISCV64Breakpad;
+       break;
+diff --git a/third_party/crashpad/crashpad/minidump/test/minidump_context_test_util.cc b/third_party/crashpad/crashpad/minidump/test/minidump_context_test_util.cc
+index db380631e4142478f4cf8d20ada040d179d31da1..1ec5001d3c35badbc4762ea7acad1f41768b88a2 100644
+--- a/third_party/crashpad/crashpad/minidump/test/minidump_context_test_util.cc
++++ b/third_party/crashpad/crashpad/minidump/test/minidump_context_test_util.cc
+@@ -308,7 +308,7 @@ void InitializeMinidumpContextPPC64(MinidumpContextPPC64* context,
+   context->context_flags = kMinidumpContextPPC64All;
+ 
+   uint64_t value = seed;
+-  for (size_t i = 0; i < base::size(context->regs); ++i) {
++  for (size_t i = 0; i < std::size(context->regs); ++i) {
+     context->regs[i] = value++;
+   }
+ 
+@@ -319,16 +319,23 @@ void InitializeMinidumpContextPPC64(MinidumpContextPPC64* context,
+   context->lnk = value++;
+   context->ctr = value++;
+ 
+-  for (size_t i = 0; i < base::size(context->fpregs); ++i) {
++  for (size_t i = 0; i < std::size(context->fpregs); ++i) {
+     context->fpregs[i] = static_cast<double>(i);
+   }
+-  context->fpscr = value++;
++  // Mirrors InitializeCPUContextPPC64(), which stores the seed-derived value
++  // as a double; the writer keeps the low half of its raw image.
++  double fpscr_double = static_cast<double>(value++);
++  uint64_t fpscr;
++  memcpy(&fpscr, &fpscr_double, sizeof(fpscr));
++  context->fpscr_pad = 0;
++  context->fpscr = static_cast<uint32_t>(fpscr);
+ 
+-  for (size_t i = 0; i < base::size(context->vregs.save_vr); ++i) {
++  for (size_t i = 0; i < std::size(context->vregs.save_vr); ++i) {
+     context->vregs.save_vr[i] = {value++, value++};
+   }
+   context->vregs.save_vscr = {value++, value++};
+-  context->vregs.save_vrsave = value++;
++  context->vregs.save_vrvalid = 0xffffffff;
++  context->vrsave = static_cast<uint32_t>(value++);
+ }
+ 
+ namespace {
+@@ -687,7 +694,7 @@ void ExpectMinidumpContextPPC64(uint32_t expect_seed,
+ 
+   EXPECT_EQ(observed->context_flags, expected.context_flags);
+ 
+-  for (size_t i = 0; i < base::size(expected.regs); ++i) {
++  for (size_t i = 0; i < std::size(expected.regs); ++i) {
+     EXPECT_EQ(observed->regs[i], expected.regs[i]);
+   }
+ 
+@@ -698,18 +705,19 @@ void ExpectMinidumpContextPPC64(uint32_t expect_seed,
+   EXPECT_EQ(observed->lnk, expected.lnk);
+   EXPECT_EQ(observed->ctr, expected.ctr);
+ 
+-  for (size_t i = 0; i < base::size(expected.fpregs); ++i) {
++  for (size_t i = 0; i < std::size(expected.fpregs); ++i) {
+     EXPECT_EQ(observed->fpregs[i], expected.fpregs[i]);
+   }
+   EXPECT_EQ(observed->fpscr, expected.fpscr);
+ 
+-  for (size_t i = 0; i < base::size(expected.vregs.save_vr); ++ i) {
++  for (size_t i = 0; i < std::size(expected.vregs.save_vr); ++ i) {
+     EXPECT_EQ(observed->vregs.save_vr[i].lo, expected.vregs.save_vr[i].lo);
+     EXPECT_EQ(observed->vregs.save_vr[i].hi, expected.vregs.save_vr[i].hi);
+   }
+   EXPECT_EQ(observed->vregs.save_vscr.lo, expected.vregs.save_vscr.lo);
+   EXPECT_EQ(observed->vregs.save_vscr.hi, expected.vregs.save_vscr.hi);
+-  EXPECT_EQ(observed->vregs.save_vrsave, expected.vregs.save_vrsave);
++  EXPECT_EQ(observed->vregs.save_vrvalid, expected.vregs.save_vrvalid);
++  EXPECT_EQ(observed->vrsave, expected.vrsave);
+ }
+ 
+ }  // namespace test
+diff --git a/third_party/crashpad/crashpad/snapshot/linux/debug_rendezvous_test.cc b/third_party/crashpad/crashpad/snapshot/linux/debug_rendezvous_test.cc
+index 3b68c8e08fb06aba65d74cf4ba079ee1fb5f9f3d..6fd0681c272c892d0110e6a8d389ac738640c3f1 100644
+--- a/third_party/crashpad/crashpad/snapshot/linux/debug_rendezvous_test.cc
++++ b/third_party/crashpad/crashpad/snapshot/linux/debug_rendezvous_test.cc
+@@ -201,7 +201,7 @@ void TestAgainstTarget(PtraceConnection* connection) {
+ #endif
+           return is_vdso_mapping ==
+                  (module_name.empty() ||
+-                  module_name.compare(0, strlen(kPrefix), kPrefix) == 0) ||
++                  module_name.compare(0, strlen(kPrefix), kPrefix) == 0 ||
+                   module_name.compare(0, strlen(kPrefix64), kPrefix64) == 0);
+         },
+         module_mapping->name,
+diff --git a/third_party/crashpad/crashpad/snapshot/linux/test_modules.cc b/third_party/crashpad/crashpad/snapshot/linux/test_modules.cc
+index f269a6bd8218c696a4894000704616d80fc8ac83..6dac7ac94b43e9553ab7f382aee1b3906225b14f 100644
+--- a/third_party/crashpad/crashpad/snapshot/linux/test_modules.cc
++++ b/third_party/crashpad/crashpad/snapshot/linux/test_modules.cc
+@@ -113,11 +113,16 @@ bool WriteTestModule(const base::FilePath& module_path,
+   module.ehdr.e_machine = EM_MIPS;
+ #elif defined(ARCH_CPU_RISCV64)
+   module.ehdr.e_machine = EM_RISCV;
++#elif defined(ARCH_CPU_PPC64)
++  module.ehdr.e_machine = EM_PPC64;
+ #endif
+ 
+ #if defined(ARCH_CPU_RISCV64)
+   // Crashpad supports RV64GC
+   module.ehdr.e_flags = EF_RISCV_RVC | EF_RISCV_FLOAT_ABI_DOUBLE;
++#elif defined(ARCH_CPU_PPC64)
++  // The dynamic loader only accepts objects using its own ABI: ELFv2.
++  module.ehdr.e_flags = 2;
+ #endif
+ 
+   module.ehdr.e_version = EV_CURRENT;
+diff --git a/third_party/crashpad/crashpad/snapshot/minidump/minidump_context_converter.cc b/third_party/crashpad/crashpad/snapshot/minidump/minidump_context_converter.cc
+index ec02dff1266785d98dc119a9cfa9e3980a02d84f..98bdac83eefaf4ca04f6052566945a452bd10d3d 100644
+--- a/third_party/crashpad/crashpad/snapshot/minidump/minidump_context_converter.cc
++++ b/third_party/crashpad/crashpad/snapshot/minidump/minidump_context_converter.cc
+@@ -266,6 +266,46 @@ bool MinidumpContextConverter::Initialize(
+     context_.mips64->fir = src->fir;
+ 
+     memcpy(&context_.mips64->fpregs, &src->fpregs, sizeof(src->fpregs));
++  } else if (context_.architecture == CPUArchitecture::kCPUArchitecturePPC64) {
++    context_memory_.resize(sizeof(CPUContextPPC64));
++    context_.ppc64 = reinterpret_cast<CPUContextPPC64*>(context_memory_.data());
++    const MinidumpContextPPC64* src =
++        reinterpret_cast<const MinidumpContextPPC64*>(minidump_context.data());
++    if (minidump_context.size() < sizeof(MinidumpContextPPC64)) {
++      return false;
++    }
++
++    if (!(src->context_flags & kMinidumpContextPPC64)) {
++      return false;
++    }
++
++    context_.ppc64->nip = src->nip;
++    context_.ppc64->msr = src->msr;
++    context_.ppc64->ccr = src->ccr;
++    context_.ppc64->xer = src->xer;
++    context_.ppc64->lnk = src->lnk;
++    context_.ppc64->ctr = src->ctr;
++
++    static_assert(sizeof(context_.ppc64->regs) == sizeof(src->regs),
++                  "GPR size mismatch");
++    memcpy(&context_.ppc64->regs, &src->regs, sizeof(src->regs));
++
++    static_assert(sizeof(context_.ppc64->fpregs) == sizeof(src->fpregs),
++                  "FPR size mismatch");
++    memcpy(&context_.ppc64->fpregs, &src->fpregs, sizeof(src->fpregs));
++
++    // The snapshot carries FPSCR as the raw 64-bit register image.
++    const uint64_t fpscr = src->fpscr;
++    memcpy(&context_.ppc64->fpscr, &fpscr, sizeof(fpscr));
++
++    static_assert(sizeof(context_.ppc64->vregs.save_vr) ==
++                      sizeof(src->vregs.save_vr),
++                  "VR size mismatch");
++    memcpy(&context_.ppc64->vregs.save_vr,
++           &src->vregs.save_vr,
++           sizeof(src->vregs.save_vr));
++    context_.ppc64->vregs.save_vscr = src->vregs.save_vscr;
++    context_.ppc64->vregs.save_vrsave = static_cast<uint32_t>(src->vrsave);
+   } else if (context_.architecture ==
+              CPUArchitecture::kCPUArchitectureRISCV64) {
+     context_memory_.resize(sizeof(CPUContextRISCV64));
+diff --git a/third_party/crashpad/crashpad/snapshot/minidump/system_snapshot_minidump.cc b/third_party/crashpad/crashpad/snapshot/minidump/system_snapshot_minidump.cc
+index b7c7bfd0a86642aa7f4fefe24734cd7442a2a933..301653dd3de9caa9d7794a1515bb5820d8aa3ab5 100644
+--- a/third_party/crashpad/crashpad/snapshot/minidump/system_snapshot_minidump.cc
++++ b/third_party/crashpad/crashpad/snapshot/minidump/system_snapshot_minidump.cc
+@@ -65,6 +65,8 @@ CPUArchitecture SystemSnapshotMinidump::GetCPUArchitecture() const {
+     case kMinidumpCPUArchitectureARM64:
+     case kMinidumpCPUArchitectureARM64Breakpad:
+       return kCPUArchitectureARM64;
++    case kMinidumpCPUArchitecturePPC64:
++      return kCPUArchitecturePPC64;
+     case kMinidumpCPUArchitectureMIPS:
+       return kCPUArchitectureMIPSEL;
+     // No word on how MIPS64 is signalled
+diff --git a/third_party/crashpad/crashpad/snapshot/test/test_cpu_context.cc b/third_party/crashpad/crashpad/snapshot/test/test_cpu_context.cc
+index 168963bbfcf1d2631a65e4250f71ac4a3302483f..91fe3a32b186b3b8d546c48d43133c0537db513d 100644
+--- a/third_party/crashpad/crashpad/snapshot/test/test_cpu_context.cc
++++ b/third_party/crashpad/crashpad/snapshot/test/test_cpu_context.cc
+@@ -327,7 +327,7 @@ void InitializeCPUContextPPC64(CPUContext* context, uint32_t seed) {
+   }
+ 
+   uint64_t value = seed;
+-  for (size_t i = 0; i < base::size(ppc64->regs); ++i) {
++  for (size_t i = 0; i < std::size(ppc64->regs); ++i) {
+       ppc64->regs[i] = value++;
+   }
+ 
+@@ -338,12 +338,12 @@ void InitializeCPUContextPPC64(CPUContext* context, uint32_t seed) {
+   ppc64->lnk = value++;
+   ppc64->ctr = value++;
+ 
+-  for (size_t i = 0; i < base::size(ppc64->fpregs); ++i) {
++  for (size_t i = 0; i < std::size(ppc64->fpregs); ++i) {
+       ppc64->fpregs[i] = static_cast<double>(i);
+   }
+   ppc64->fpscr = value++;
+ 
+-  for (size_t i = 0; i < base::size(ppc64->vregs.save_vr); ++i) {
++  for (size_t i = 0; i < std::size(ppc64->vregs.save_vr); ++i) {
+       ppc64->vregs.save_vr[i] = {value++, value++};
+   }
+   ppc64->vregs.save_vscr = {value++, value++};
